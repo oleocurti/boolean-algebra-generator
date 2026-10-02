@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Circuitos Booleanos</title>
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+<style>
+body{background:#101114;color:#eee}
+.navbar{background:#191a1f;border-bottom:1px solid #34363d}
+.card{background:#191a1f;border:1px solid #34363d}
+.form-select,.form-control{background:#24262c;color:#fff;border-color:#464951}
+.form-select:focus,.form-control:focus{background:#24262c;color:#fff}
+.circuit-wrap{background:#14161b;border-radius:10px;overflow:auto;padding:20px;border:1px solid #34363d}
+#circuitSvg{display:block;min-width:1050px;width:100%;height:470px}
+.formula{font-family:monospace;font-size:1.15rem;color:#7dd3fc;word-break:break-word}
+.signal-box{background:#18191d;border:1px solid #34363d;border-radius:10px;padding:14px}
+.signal-row{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.signal-cell{height:45px;display:flex;align-items:center;justify-content:center;border:1px solid #45474d;font-weight:700}
+.bit1{background:#122412; border-top: 2px solid #fff;color:#fff}.bit0{background:#241212; border-bottom: 2px solid #fff;color:#fff}.unknown{background:#22242a;color:#777}
+.intervals{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.interval{text-align:center;color:#999;font-size:.75rem}
+.gate-chip{display:inline-block;background:#181818;border:1px solid #fff;padding:5px 9px;border-radius:20px;margin:2px}
+
+@media (min-width: 1400px) {
+    .container, .container-lg, .container-md, .container-sm, .container-xl, .container-xxl {
+        max-width: 1800px;
+    }
+}
+
+.cwhite{
+  color: #fff !important;
+}
+h4{
+  color: #fff;
+}
+</style>
+</head>
+
+<body>
+<nav class="navbar navbar-dark">
+<div class="container"><span class="navbar-brand fw-bold">⚡ Gerador de Álgebra Booleana</span></div>
+</nav>
+
+<div class="container py-4">
+
+<div class="text-center mb-4">
+<h1 class="fw-bold">Gerador de Circuitos Lógicos</h1>
+<p class="text-secondary">Símbolos tradicionais + expressão + diagrama de tempo</p>
+</div>
+
+<div class="card mb-4">
+<div class="card-body">
+<h4 class="cwhite">⚙️ Configuração</h4>
+<div class="row g-3 mt-1">
+<div class="col-md-4">
+<label class="form-label cwhite">Complexidade</label>
+<select id="level" class="form-select">
+<option value="1">1 porta</option>
+<option value="2">2 portas</option>
+<option value="3" selected>3 portas</option>
+<option value="4">4 portas</option>
+<option value="5">5 portas</option>
+<option value="6">6 portas</option>
+<option value="7">7 portas</option>
+<option value="8">8 portas</option>
+<option value="9">9 portas</option>
+<option value="10">10 portas</option>
+</select>
+</div>
+<div class="col-md-4">
+<label class="form-label cwhite">Portas permitidas</label>
+<select id="mode" class="form-select">
+<option value="all">Todas</option>
+<option value="basic">AND / OR / NOT</option>
+<option value="noNot">Sem NOT</option>
+</select>
+</div>
+<div class="col-md-4">
+<label class="form-label cwhite">Conexões entre portas</label>
+<div class="form-check form-switch mt-2">
+<input class="form-check-input" type="checkbox" id="fanout">
+<label class="form-check-label cwhite" for="fanout">Permitir ramificações (fan-out)</label>
+</div>
+</div>
+<div class="col-md-4">
+<label class="form-label cwhite">Exercício</label>
+<input id="exercise" class="form-control" value="1" readonly>
+</div>
+</div>
+<div class="mt-4">
+<button class="btn btn-primary btn-lg" id="newBtn">🔄 Novo circuito</button>
+<button class="btn btn-warning btn-lg ms-2" id="answerBtn">👁 Mostrar resposta</button>
+</div>
+</div>
+</div>
+
+<div class="card mb-4">
+<div class="card-body">
+<div class="row text-center">
+<div class="col-md-4"><span class="text-secondary">Portas</span><div class="cwhite" id="gateInfo">-</div></div>
+<div class="col-md-4"><span class="text-secondary">Entradas</span><div class="cwhite" id="inputInfo">-</div></div>
+<div class="col-md-4"><span class="text-secondary">Validação</span><div class="cwhite" id="validInfo" class="text-success">-</div></div>
+</div>
+</div>
+</div>
+
+<div class="card mb-4">
+<div class="card-body">
+<h4 class="cwhite">🔌 Circuito lógico</h4>
+<p class="text-secondary mb-3">Símbolos IEC/ANSI tradicionais. Fundo branco para facilitar a leitura.</p>
+<div class="circuit-wrap">
+<svg id="circuitSvg" viewBox="0 0 1400 700" xmlns="http://www.w3.org/2000/svg"></svg>
+</div>
+</div>
+</div>
+
+<div class="card mb-4">
+<div class="card-body">
+<h4>🧮 Expressão booleana</h4>
+<div id="formula" class="formula">Expressão oculta</div>
+</div>
+</div>
+
+<div class="card mb-4">
+<div class="card-body">
+<h4>📊 Diagrama de tempo</h4>
+<div id="signals"></div>
+<div class="signal-box mt-3">
+<div class="fw-bold mb-2 cwhite">S</div>
+<div id="signalS" class="signal-row"></div>
+</div>
+</div>
+</div>
+
+<div class="card mb-5">
+<div class="card-body">
+<h4>📋 Valores por intervalo</h4>
+<div class="table-responsive">
+<table class="table table-dark table-striped text-center">
+<thead id="thead"></thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+<div id="answer" class="mt-3 text-secondary">Resposta oculta.</div>
+</div>
+</div>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let exercise=1, circuit=null, result=null, answerVisible=false;
+
+const ALL=["AND","OR","NOT","NAND","NOR","XOR","XNOR"];
+const BASIC=["AND","OR","NOT"];
+const NONOT=["AND","OR","NAND","NOR","XOR","XNOR"];
+
+function rnd(){return Math.random()<.5?0:1}
+function gatePool(){
+  const m=$("mode").value;
+  return m==="basic"?BASIC:m==="noNot"?NONOT:ALL;
+}
+function pick(a){return a[Math.floor(Math.random()*a.length)]}
+
+function calc(g,a,b){
+  if(g==="AND")return a&b;
+  if(g==="OR")return a|b;
+  if(g==="NOT")return a?0:1;
+  if(g==="NAND")return (a&b)?0:1;
+  if(g==="NOR")return (a|b)?0:1;
+  if(g==="XOR")return a!==b?1:0;
+  return a===b?1:0;
+}
+
+function expression(c){
+  const memo=new Map();
+  function walk(node){
+    if(memo.has(node))return memo.get(node);
+    let e;
+    if(node.type==="leaf") e=node.name;
+    else if(node.gate==="NOT") e=`~(${walk(node.child)})`;
+    else e=`(${walk(node.left)} ${node.gate==="AND"||node.gate==="NAND"?"·":node.gate==="OR"||node.gate==="NOR"?"+":node.gate==="XOR"||node.gate==="XNOR"?"⊕":"?"} ${walk(node.right)})`;
+    if(node.type==="gate" && node.gate==="NAND") e=`~${e}`;
+    if(node.type==="gate" && node.gate==="NOR") e=`~${e}`;
+    if(node.type==="gate" && node.gate==="XNOR") e=`~${e}`;
+    memo.set(node,e);
+    return e;
+  }
+  return walk(c.root);
+}
+
+/* =========================================================
+   CONSTRUÇÃO DOS CIRCUITOS
+   =========================================================
+   Fan-out desligado:
+     árvore pura, cada saída é usada por apenas uma entrada.
+
+   Fan-out ligado:
+     grafo acíclico direcionado (DAG). Uma saída de uma porta
+     pode alimentar várias portas posteriores. Nenhuma ligação
+     volta para uma etapa anterior, portanto não há ciclos.
+*/
+function buildTreeCircuit(n,pool){
+  function makeTree(count){
+    if(count===0)return {type:"leaf"};
+    const gate=pick(pool);
+    if(gate==="NOT"){
+      return {type:"gate",gate,child:makeTree(count-1)};
+    }
+    const remaining=count-1;
+    const leftCount=Math.floor(remaining/2);
+    const rightCount=remaining-leftCount;
+    return {
+      type:"gate",gate,
+      left:makeTree(leftCount),
+      right:makeTree(rightCount)
+    };
+  }
+
+  const root=makeTree(n);
+  const inputs=[];
+  let inputIndex=0,gateIndex=0;
+
+  function assign(node){
+    if(node.type==="leaf"){
+      node.name=String.fromCharCode(65+inputIndex++);
+      inputs.push(node.name);
+      return;
+    }
+    node.id="G"+(++gateIndex);
+    if(node.gate==="NOT")assign(node.child);
+    else{
+      assign(node.left);
+      assign(node.right);
+    }
+  }
+  assign(root);
+
+  return {root,inputs,gateCount:n,output:root,fanout:false,hasFanout:false};
+}
+
+/* Lista as portas do grafo (sem repetir), das entradas para a saída. */
+function collectGates(root){
+  const seen=new Set(),out=[];
+  (function walk(node){
+    if(!node||seen.has(node)||node.type==="leaf")return;
+    seen.add(node);
+    if(node.gate==="NOT")walk(node.child);
+    else{walk(node.left);walk(node.right);}
+    out.push(node);
+  })(root);
+  return out;
+}
+
+function buildCircuit(){
+  const n=+$("level").value;
+  const pool=gatePool();
+  const fanout=$("fanout").checked;
+
+  if(!fanout) return buildTreeCircuit(n,pool);
+
+  /*
+    Modo fan-out: cada nova porta só usa sinais já existentes (grafo
+    acíclico). Controlamos os sinais "soltos" (ainda sem uso) para que,
+    ao final, TODAS as portas e entradas estejam ligadas à saída S.
+    Assim o circuito nunca perde portas, mesmo com muitas portas.
+  */
+  const binaryPool=pool.filter(g=>g!=="NOT");
+
+  for(let attempt=0;attempt<500;attempt++){
+    const nodes=[
+      {type:"leaf",name:"A"},
+      {type:"leaf",name:"B"}
+    ];
+    const gates=[];
+    const uses=new Map(nodes.map(x=>[x,0]));
+    const loose=()=>nodes.filter(x=>uses.get(x)===0);
+    let nextInputCode=67; // C
+    let ok=true;
+
+    for(let i=1;i<=n&&ok;i++){
+      const r=n-i; // portas que ainda virão depois desta
+
+      // Às vezes cria uma nova entrada primária (máx. 12 no total).
+      if(nextInputCode<=76 && i<n && Math.random()<0.28 && loose().length<=r){
+        const leaf={type:"leaf",name:String.fromCharCode(nextInputCode++)};
+        nodes.push(leaf);
+        uses.set(leaf,0);
+      }
+
+      const d=loose();
+      let gate=pick(pool);
+      let maxK=gate==="NOT"?1:2;
+      // mínimo de sinais soltos que esta porta precisa consumir
+      let need=Math.max(0,d.length-r);
+      if(need>maxK && gate==="NOT"){gate=pick(binaryPool);maxK=2;}
+      if(need>maxK){ok=false;break;}
+
+      const chosen=[];
+      const pickFrom=list=>list[Math.floor(Math.random()*list.length)];
+      // 1) consome os sinais soltos obrigatórios
+      const dPool=d.slice();
+      for(let k=0;k<need;k++){
+        const s=pickFrom(dPool);
+        dPool.splice(dPool.indexOf(s),1);
+        chosen.push(s);
+      }
+      // 2) completa as entradas restantes
+      const slots=gate==="NOT"?1:2;
+      while(chosen.length<slots){
+        const leftover=dPool.filter(x=>!chosen.includes(x));
+        const others=nodes.filter(x=>!chosen.includes(x));
+        let s;
+        if(leftover.length && Math.random()<0.55) s=pickFrom(leftover);
+        else s=pickFrom(others);
+        chosen.push(s);
+        const idx=dPool.indexOf(s);
+        if(idx>=0)dPool.splice(idx,1);
+      }
+
+      let g;
+      if(gate==="NOT"){
+        g={type:"gate",id:"G"+i,gate,child:chosen[0]};
+      }else{
+        // posição aleatória (qual sinal vai em cima/embaixo)
+        if(Math.random()<0.5)chosen.reverse();
+        g={type:"gate",id:"G"+i,gate,left:chosen[0],right:chosen[1]};
+      }
+      chosen.forEach(s=>uses.set(s,uses.get(s)+1));
+      gates.push(g);
+      nodes.push(g);
+      uses.set(g,0);
+    }
+    if(!ok)continue;
+
+    const root=gates[gates.length-1];
+    const hasFanout=[...uses.values()].some(v=>v>1);
+    if(!hasFanout)continue;
+
+    // Confere: todas as portas e entradas precisam chegar à saída.
+    const reach=new Set();
+    (function mark(node){
+      if(!node||reach.has(node))return;
+      reach.add(node);
+      if(node.type==="gate"){
+        if(node.gate==="NOT")mark(node.child);
+        else{mark(node.left);mark(node.right);}
+      }
+    })(root);
+    if(reach.size!==nodes.length)continue;
+
+    const inputs=nodes.filter(x=>x.type==="leaf").map(x=>x.name);
+    if(inputs.length<2||inputs.length>12)continue;
+
+    return {
+      root,inputs,gateCount:n,output:root,
+      fanout:true,hasFanout:true,nodes:gates
+    };
+  }
+
+  // Fallback seguro (ex.: circuito de 1 porta não permite ramificação):
+  // árvore comum, mas com a lista de portas preenchida para o desenho.
+  const t=buildTreeCircuit(n,pool);
+  return {...t,fanout:true,hasFanout:false,nodes:collectGates(t.root)};
+}
+
+/* =========================================================
+   AVALIAÇÃO
+   ========================================================= */
+function evaluate(c){
+  const vals={};
+
+  c.inputs.forEach(x=>vals[x]=Array.from({length:10},rnd));
+
+  const memo=new Map();
+
+  function walk(node){
+    if(memo.has(node))return memo.get(node);
+
+    let out;
+    if(node.type==="leaf"){
+      out=vals[node.name];
+    }else if(node.gate==="NOT"){
+      const a=walk(node.child);
+      out=a.map(v=>calc("NOT",v,0));
+    }else{
+      const a=walk(node.left);
+      const b=walk(node.right);
+      out=a.map((v,i)=>calc(node.gate,v,b[i]));
+    }
+
+    if(node.type==="gate")vals[node.id]=out;
+    memo.set(node,out);
+    return out;
+  }
+
+  const output=walk(c.root);
+  return {values:vals,output};
+}
+
+/* ---------- SVG: símbolos tradicionais ---------- */
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs={},text=""){
+  const e=document.createElementNS(NS,tag);
+  Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));
+  if(text)e.textContent=text;
+  return e;
+}
+function path(svg,d){
+  svg.appendChild(el("path",{d,fill:"none",stroke:C_INK,"stroke-width":3,"stroke-linejoin":"round","stroke-linecap":"round"}));
+}
+/* Uma cor fixa por entrada (A, B, C...) para seguir cada sinal no circuito. */
+/* Tema escuro do circuito */
+const C_INK="#e8e9ee";   // fios, contornos e textos
+const C_GATE="#1d2027";  // preenchimento das portas
+const INPUT_COLORS=["#ff6b6b","#4dabf7","#69db7c","#ffa94d","#b197fc","#e0a47a","#f783ac","#3bc9db","#d0d92b","#38d9a9","#ffd43b","#9fa8ff"];
+function inputColor(name){
+  const i=(String(name).charCodeAt(0)-65+INPUT_COLORS.length*4)%INPUT_COLORS.length;
+  return INPUT_COLORS[i];
+}
+function wire(svg,x1,y1,x2,y2,extra="",color=C_INK){
+  svg.appendChild(el("path",{
+    d:Math.abs(y1-y2)<0.5
+      ?`M ${x1} ${y1} H ${x2}`
+      :Math.abs(x1-x2)<0.5
+        ?`M ${x1} ${y1} V ${y2}`
+        :`M ${x1} ${y1} H ${x2} V ${y2}`,
+    fill:"none",stroke:color,"stroke-width":3,
+    "stroke-linejoin":"round","stroke-linecap":"square",
+    "data-kind":extra
+  }));
+}
+function label(svg,x,y,t,size=18,color=C_INK){
+  svg.appendChild(el("text",{x,y,fill:color,"font-size":size,"font-family":"Arial","font-weight":"bold"},t));
+}
+
+/* AND */
+function drawAND(svg,x,y,nand=false){
+  const h=58;
+  const d=`M ${x} ${y-h/2} L ${x+32} ${y-h/2}
+           A 32 29 0 0 1 ${x+32} ${y+h/2}
+           L ${x} ${y+h/2} Z`;
+  svg.appendChild(el("path",{d,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  svg.appendChild(el("text",{x:x+29,y:y+5,"text-anchor":"middle",fill:C_INK,"font-size":"11","font-family":"Arial","font-weight":"bold"},nand?"NAND":"AND"));
+  if(nand)svg.appendChild(el("circle",{cx:x+75,cy:y,r:6,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  return {inX:x,inTop:y-h/4,inBottom:y+h/4,outX:x+75+(nand?12:0),outY:y};
+}
+
+/* OR/XOR/NOR/XNOR */
+function drawOR(svg,x,y,xor=false,nor=false){
+  const h=70;
+  const d=`M ${x} ${y-h/2}
+           Q ${x+32} ${y-35} ${x+70} ${y}
+           Q ${x+32} ${y+35} ${x} ${y+h/2}
+           Q ${x+18} ${y} ${x} ${y-h/2} Z`;
+  svg.appendChild(el("path",{d,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  if(xor)path(svg,`M ${x-10} ${y-h/2+5} Q ${x+10} ${y} ${x-10} ${y+h/2-5}`);
+  svg.appendChild(el("text",{x:x+35,y:y+5,"text-anchor":"middle",fill:C_INK,"font-size":"10","font-family":"Arial","font-weight":"bold"},xor?(nor?"XNOR":"XOR"):(nor?"NOR":"OR")));
+  if(nor)svg.appendChild(el("circle",{cx:x+76,cy:y,r:6,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  return {inX:x-1,inTop:y-20,inBottom:y+20,outX:x+76+(nor?12:0),outY:y};
+}
+
+/* NOT */
+function drawNOT(svg,x,y){
+  const d=`M ${x} ${y-28} L ${x} ${y+28} L ${x+55} ${y} Z`;
+  svg.appendChild(el("path",{d,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  svg.appendChild(el("text",{x:x+27,y:y+5,"text-anchor":"middle",fill:C_INK,"font-size":"11","font-family":"Arial","font-weight":"bold"},"NOT"));
+  svg.appendChild(el("circle",{cx:x+61,cy:y,r:6,fill:C_GATE,stroke:C_INK,"stroke-width":3}));
+  return {inX:x,inTop:y,inBottom:y,outX:x+75,outY:y};
+}
+function gateShape(svg,g,x,y){
+  if(g==="AND")return drawAND(svg,x,y,false);
+  if(g==="NAND")return drawAND(svg,x,y,true);
+  if(g==="OR")return drawOR(svg,x,y,false,false);
+  if(g==="NOR")return drawOR(svg,x,y,false,true);
+  if(g==="XOR")return drawOR(svg,x,y,true,false);
+  if(g==="XNOR")return drawOR(svg,x,y,true,true);
+  return drawNOT(svg,x,y);
+}
+
+/* =========================================================
+   DESENHO
+   ========================================================= */
+function drawCircuit(c){
+  const svg=$("circuitSvg");
+  svg.innerHTML="";
+
+  svg.style.height="";svg.style.width="";svg.style.minWidth="";
+  if(c.fanout) drawFanoutCircuit(c);
+  else drawTreeCircuit(c);
+}
+
+function drawTreeCircuit(c){
+  const svg=$("circuitSvg");
+  const ROW=64, LEFT=95, FIRST_GATE_X=145, COL_GAP=140, RIGHT=85, TOP=55;
+  let leafCounter=0,maxDepth=0;
+
+  function measure(node,depth=0){
+    node.depth=depth;
+    maxDepth=Math.max(maxDepth,depth);
+    if(node.type==="leaf"){
+      node.leafStart=node.leafEnd=leafCounter;
+      node.y=TOP+leafCounter*ROW;
+      leafCounter++;
+      return;
+    }
+    if(node.gate==="NOT"){
+      measure(node.child,depth+1);
+      node.leafStart=node.child.leafStart;node.leafEnd=node.child.leafEnd;
+    }else{
+      measure(node.left,depth+1);measure(node.right,depth+1);
+      node.leafStart=node.left.leafStart;node.leafEnd=node.right.leafEnd;
+    }
+    node.y=TOP+((node.leafStart+node.leafEnd)/2)*ROW;
+  }
+
+  measure(c.root);
+  const H=Math.max(420,TOP*2+(leafCounter-1)*ROW+70);
+  const W=Math.max(950,FIRST_GATE_X+maxDepth*COL_GAP+155);
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.setAttribute("height",H);
+
+  function nodeX(node){return FIRST_GATE_X+(maxDepth-node.depth)*COL_GAP}
+
+  function connect(source,target,targetY){
+    const sx=source.type==="leaf"?LEFT:nodeX(source)+82;
+    const sy=source.y,tx=nodeX(target),corridor=tx-55;
+    const col=source.type==="leaf"?inputColor(source.name):C_INK;
+    if(Math.abs(sy-targetY)<.5)wire(svg,sx,sy,tx,targetY,"",col);
+    else{
+      wire(svg,sx,sy,corridor,sy,"",col);
+      wire(svg,corridor,sy,corridor,targetY,"",col);
+      wire(svg,corridor,targetY,tx,targetY,"",col);
+    }
+  }
+
+  function drawLeaves(node){
+    if(node.type==="leaf"){
+      label(svg,18,node.y+7,node.name,20,inputColor(node.name));
+      wire(svg,45,node.y,95,node.y,"",inputColor(node.name));
+      return;
+    }
+    if(node.gate==="NOT")drawLeaves(node.child);
+    else{drawLeaves(node.left);drawLeaves(node.right);}
+  }
+  drawLeaves(c.root);
+
+  function drawNodes(node){
+    if(node.type==="leaf")return;
+    const x=nodeX(node),y=node.y,shape=gateShape(svg,node.gate,x,y);
+
+    if(node.gate==="NOT"){
+      drawNodes(node.child);
+      connect(node.child,node,y);
+    }else{
+      drawNodes(node.left);drawNodes(node.right);
+      connect(node.left,node,y-18);
+      connect(node.right,node,y+18);
+    }
+
+    if(node===c.root){
+      wire(svg,shape.outX,y,W-RIGHT,y);
+      label(svg,W-RIGHT+15,y+7,"S",22);
+    }
+  }
+  drawNodes(c.root);
+
+  function markStages(node){
+    if(node.type==="leaf")return;
+    label(svg,nodeX(node)+22,25,`ESTÁGIO ${node.depth+1}`,11);
+    if(node.gate==="NOT")markStages(node.child);
+    else{markStages(node.left);markStages(node.right);}
+  }
+  markStages(c.root);
+}
+
+/*
+  Modo fan-out (roteamento por canais):
+  - cada estágio fica em uma coluna; entre colunas existe um "canal";
+  - cada fio vertical recebe uma trilha (x) EXCLUSIVA dentro do canal,
+    então dois fios diferentes nunca se sobrepõem na vertical;
+  - as portas de estágios vizinhos ficam em alturas intercaladas, então
+    nenhum fio horizontal coincide com o de outro sinal;
+  - ligações que pulam estágios descem para uma pista inferior própria;
+  - ● marca os pontos reais de ramificação.
+*/
+function drawFanoutCircuit(c){
+  const svg=$("circuitSvg");
+
+  const ROW=92, LEFT=105, TOP=95, TRACK=16, LANE=20;
+  const RIGHT=110, SAFE=26, PAD=16;
+
+  const refsOf=g=>g.gate==="NOT"?[g.child]:[g.left,g.right];
+  const gates=collectGates(c.root);
+
+  // entradas (objetos reais do grafo), em ordem alfabética
+  const leafSet=new Set();
+  gates.forEach(g=>refsOf(g).forEach(r=>{if(r.type==="leaf")leafSet.add(r);}));
+  const leaves=[...leafSet].sort((a,b)=>a.name.localeCompare(b.name));
+
+  // ---------- estágios ----------
+  const layerOf=new Map();
+  leaves.forEach(l=>layerOf.set(l,0));
+  function depth(n){
+    if(layerOf.has(n))return layerOf.get(n);
+    const d=Math.max(...refsOf(n).map(depth))+1;
+    layerOf.set(n,d);
+    return d;
+  }
+  gates.forEach(depth);
+  const maxLayer=Math.max(1,...gates.map(g=>layerOf.get(g)));
+  const layers=[];
+  for(let i=0;i<=maxLayer;i++)layers.push([]);
+  leaves.forEach(l=>layers[0].push(l));
+  gates.forEach(g=>layers[layerOf.get(g)].push(g));
+
+  // ---------- posições verticais ----------
+  // Estágios pares usam a grade 0, ímpares a grade 1/2 linha:
+  // assim a saída de uma porta nunca fica na mesma altura de uma
+  // entrada de porta do estágio seguinte.
+  const pos=new Map();
+  function place(){
+    layers[0].forEach((n,i)=>pos.set(n,TOP+i*ROW));
+    for(let l=1;l<=maxLayer;l++){
+      const off=(l%2)*ROW/2;
+      const bary=n=>{
+        const ys=refsOf(n).map(r=>pos.get(r));
+        return ys.reduce((s,y)=>s+y,0)/ys.length;
+      };
+      const arr=layers[l].slice().sort((a,b)=>bary(a)-bary(b));
+      let prev=-1;
+      arr.forEach(n=>{
+        let s=Math.round((bary(n)-TOP-off)/ROW);
+        s=Math.max(s,prev+1,0);
+        prev=s;
+        pos.set(n,TOP+off+s*ROW);
+      });
+      layers[l]=arr;
+    }
+  }
+  place();
+  // reordena as entradas pela altura média das portas que as usam
+  for(let it=0;it<2;it++){
+    const cons=new Map();
+    gates.forEach(g=>refsOf(g).forEach(r=>{
+      if(r.type==="leaf"){
+        if(!cons.has(r))cons.set(r,[]);
+        cons.get(r).push(pos.get(g));
+      }
+    }));
+    layers[0].sort((a,b)=>{
+      const m=n=>{const v=cons.get(n)||[0];return v.reduce((s,y)=>s+y,0)/v.length;};
+      return m(a)-m(b)||a.name.localeCompare(b.name);
+    });
+    place();
+  }
+
+  // ---------- geometria das portas ----------
+  const portOff=g=>g==="NOT"?0:(g==="AND"||g==="NAND")?14.5:20;
+  const inOff=g=>(g==="AND"||g==="NAND"||g==="NOT")?0:-1;
+  const outOff=g=>({AND:75,NAND:81,OR:76,NOR:82,XOR:76,XNOR:82,NOT:67})[g];
+
+  // ---------- arestas ----------
+  const edges=[];
+  gates.forEach(g=>{
+    if(g.gate==="NOT")edges.push({src:g.child,tgt:g,port:0});
+    else{
+      edges.push({src:g.left,tgt:g,port:-1});
+      edges.push({src:g.right,tgt:g,port:1});
+    }
+  });
+  edges.forEach(e=>{
+    e.sl=layerOf.get(e.src);
+    e.tl=layerOf.get(e.tgt);
+    e.long=e.tl>e.sl+1;
+    e.py=pos.get(e.tgt)+e.port*portOff(e.tgt.gate);
+  });
+  const bySrc=new Map();
+  edges.forEach(e=>{
+    if(!bySrc.has(e.src))bySrc.set(e.src,[]);
+    bySrc.get(e.src).push(e);
+  });
+
+  // ---------- trilhas exclusivas em cada canal ----------
+  // canal k = espaço entre o estágio k e o estágio k+1
+  const slotCount=new Array(maxLayer).fill(0);
+  const trunkSlot=new Map(), riserSlot=new Map();
+  for(let ch=0;ch<maxLayer;ch++){
+    const items=[];
+    bySrc.forEach((list,src)=>{
+      if(layerOf.get(src)===ch)items.push({kind:"t",src,y:pos.get(src)});
+    });
+    edges.forEach(e=>{
+      if(e.long&&e.tl-1===ch)items.push({kind:"r",e,y:e.py});
+    });
+    items.sort((a,b)=>(a.kind===b.kind?0:a.kind==="t"?-1:1)||a.y-b.y);
+    items.forEach((it,k)=>{
+      if(it.kind==="t")trunkSlot.set(it.src,k);
+      else riserSlot.set(it.e,k);
+    });
+    slotCount[ch]=items.length;
+  }
+
+  // ---------- posições horizontais ----------
+  const outRight=[LEFT];
+  const gx=[0];
+  const chStart=[];
+  for(let l=1;l<=maxLayer;l++){
+    const chWidth=Math.max(70,PAD+slotCount[l-1]*TRACK+SAFE);
+    chStart[l-1]=outRight[l-1];
+    gx[l]=outRight[l-1]+chWidth+2;
+    const maxOut=Math.max(...layers[l].map(g=>outOff(g.gate)));
+    outRight[l]=gx[l]+maxOut;
+  }
+  const trackX=(ch,k)=>chStart[ch]+PAD+k*TRACK;
+  const srcX=n=>n.type==="leaf"?LEFT:gx[layerOf.get(n)]+outOff(n.gate);
+  const inX=g=>gx[layerOf.get(g)]+inOff(g.gate);
+
+  // ---------- pistas inferiores (ligações que pulam estágios) ----------
+  const maxY=Math.max(...[...pos.values()]);
+  const longSrcs=[...bySrc.keys()]
+    .filter(s=>bySrc.get(s).some(e=>e.long))
+    .sort((a,b)=>pos.get(a)-pos.get(b));
+  const laneY=new Map();
+  const laneBase=maxY+80;
+  longSrcs.forEach((s,i)=>laneY.set(s,laneBase+i*LANE));
+
+  const W=outRight[maxLayer]+RIGHT+50;
+  const H=Math.max(
+    420,
+    (longSrcs.length?laneBase+(longSrcs.length-1)*LANE:maxY+50)+70
+  );
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.setAttribute("height",H);
+  // o CSS fixa height:470px; sem isto circuitos grandes eram "espremidos"
+  svg.style.height=H+"px";
+  svg.style.width=W+"px";
+  svg.style.minWidth=W+"px";
+
+  // ---------- fios ----------
+  const wireLayer=el("g",{"data-layer":"fanout-wires"});
+  svg.appendChild(wireLayer);
+  const dotLayer=el("g",{"data-layer":"fanout-dots"});
+
+  function line(pts,kind="fanout",color=C_INK){
+    let d=`M ${pts[0][0]} ${pts[0][1]}`;
+    for(let i=1;i<pts.length;i++){
+      const [x,y]=pts[i],[px,py]=pts[i-1];
+      if(Math.abs(y-py)<0.01)d+=` H ${x}`;
+      else d+=` V ${y}`;
+    }
+    wireLayer.appendChild(el("path",{
+      d,fill:"none",stroke:color,"stroke-width":3,
+      "stroke-linejoin":"round","stroke-linecap":"square",
+      "data-kind":kind
+    }));
+  }
+  function dot(x,y,color=C_INK){
+    dotLayer.appendChild(el("circle",{
+      cx:x,cy:y,r:5.5,fill:color,"data-kind":"fanout-junction"
+    }));
+  }
+
+  // entradas primárias
+  layers[0].forEach(n=>{
+    const y=pos.get(n);
+    label(svg,18,y+7,n.name,20,inputColor(n.name));
+    line([[45,y],[LEFT,y]],"input",inputColor(n.name));
+  });
+
+  bySrc.forEach((list,src)=>{
+    const sx=srcX(src), sy=pos.get(src);
+    const sl=layerOf.get(src);
+    const tx=trackX(sl,trunkSlot.get(src));
+    const col=src.type==="leaf"?inputColor(src.name):C_INK;
+    const hasLong=list.some(e=>e.long);
+    const ly=hasLong?laneY.get(src):null;
+
+    // saída da fonte até a trilha
+    line([[sx,sy],[tx,sy]],"fanout",col);
+
+    // ramos para o estágio seguinte
+    const ys=[sy];
+    list.filter(e=>!e.long).forEach(e=>{
+      line([[tx,e.py],[inX(e.tgt),e.py]],"fanout",col);
+      ys.push(e.py);
+    });
+    if(hasLong)ys.push(ly);
+
+    // tronco vertical
+    const yMin=Math.min(...ys), yMax=Math.max(...ys);
+    if(yMax-yMin>0.01)line([[tx,yMin],[tx,yMax]],"fanout",col);
+    // pontos de ramificação (apenas onde há bifurcação real)
+    [...new Set(ys)].forEach(y=>{
+      if(y>yMin+0.01&&y<yMax-0.01)dot(tx,y,col);
+    });
+
+    // pista inferior + subidas
+    if(hasLong){
+      const longs=list.filter(e=>e.long);
+      const rx=longs.map(e=>trackX(e.tl-1,riserSlot.get(e)));
+      const rMax=Math.max(...rx);
+      line([[tx,ly],[rMax,ly]],"fanout",col);
+      longs.forEach((e,i)=>{
+        const x=rx[i];
+        line([[x,ly],[x,e.py],[inX(e.tgt),e.py]],"fanout",col);
+        if(x<rMax-0.01)dot(x,ly,col);
+      });
+    }
+  });
+
+  // portas (por cima dos fios)
+  const gateLayer=el("g",{"data-layer":"fanout-gates"});
+  svg.appendChild(gateLayer);
+  gates.forEach(g=>{
+    gateShape(gateLayer,g.gate,gx[layerOf.get(g)],pos.get(g));
+  });
+  svg.appendChild(dotLayer);
+
+  // saída final
+  const root=c.root;
+  const ry=pos.get(root), rx=srcX(root);
+  line([[rx,ry],[W-RIGHT,ry]]);
+  label(svg,W-RIGHT+15,ry+7,"S",22);
+
+  for(let l=1;l<=maxLayer;l++){
+    label(svg,gx[l]+20,35,`ESTÁGIO ${l}`,11);
+  }
+  if(c.hasFanout){
+    label(svg,18,H-18,"● = ponto de ramificação (fan-out) • cada entrada tem sua própria cor",12);
+  }
+}
+/* ---------- validação estrutural ---------- */
+function validate(c){
+  let ok=true,gates=0,leaves=new Set(),visiting=new Set(),visited=new Set();
+
+  function walk(node){
+    if(!node||visiting.has(node)){ok=false;return;}
+    if(visited.has(node))return;
+
+    visiting.add(node);
+    if(node.type==="leaf"){
+      if(!node.name)ok=false;
+      leaves.add(node.name);
+    }else{
+      gates++;
+      if(!node.id||!node.gate)ok=false;
+      if(node.gate==="NOT")walk(node.child);
+      else{
+        if(!node.left||!node.right)ok=false;
+        walk(node.left);walk(node.right);
+      }
+    }
+    visiting.delete(node);
+    visited.add(node);
+  }
+
+  walk(c.root);
+  return ok&&gates===c.gateCount&&leaves.size>=2&&leaves.size<=12;
+}
+
+/* ---------- sinais ---------- */
+function signalRow(values,hidden=false){
+  return values.map(v=>
+    `<div class="signal-cell ${hidden&&!answerVisible?"unknown":v?"bit1":"bit0"}">
+      ${hidden&&!answerVisible?"?":v}
+    </div>`
+  ).join("");
+}
+function renderSignals(){
+  const c=$("signals");
+  c.innerHTML="";
+  for(const name of circuit.inputs){
+    c.innerHTML+=`
+      <div class="signal-box mb-3">
+        <div class="fw-bold mb-2 cwhite">${name}</div>
+        <div class="signal-row">${signalRow(result.values[name])}</div>
+      </div>`;
+  }
+  $("signalS").innerHTML=signalRow(result.output,true);
+}
+function renderTable(){
+  $("thead").innerHTML=`<tr><th>Intervalo</th>${circuit.inputs.map(x=>`<th>${x}</th>`).join("")}<th>S</th></tr>`;
+  let html="";
+  for(let i=0;i<10;i++){
+    html+=`<tr><td>${i}-${i+1}</td>`;
+    for(const n of circuit.inputs)html+=`<td>${result.values[n][i]}</td>`;
+    html+=`<td>${answerVisible?result.output[i]:"?"}</td></tr>`;
+  }
+  $("tbody").innerHTML=html;
+}
+
+function showAnswer(){
+  answerVisible=true;
+  renderSignals();
+  renderTable();
+  const ex=expression(circuit);
+  $("formula").textContent="S = "+ex;
+  $("answer").innerHTML=`
+    <div class="alert alert-success mb-0">
+      <strong>Expressão:</strong>
+      <div class="font-monospace mt-2">S = ${ex}</div>
+      <hr>
+      <strong>Saída S:</strong>
+      <div class="font-monospace mt-2">[ ${result.output.join("  ")} ]</div>
+    </div>`;
+}
+
+function generate(){
+  answerVisible=false;
+  do{circuit=buildCircuit()}while(!validate(circuit));
+  result=evaluate(circuit);
+
+  $("exercise").value=exercise;
+  const gateNames=[];
+  const seen=new Set();
+  (function collect(node){
+    if(!node||seen.has(node)||node.type==="leaf")return;
+    seen.add(node);
+    gateNames.push(node.gate);
+    if(node.gate==="NOT")collect(node.child);
+    else{collect(node.left);collect(node.right);}
+  })(circuit.root);
+
+  $("gateInfo").innerHTML=gateNames.map(g=>`<span class="gate-chip">${g}</span>`).join("");
+  $("inputInfo").textContent=circuit.inputs.join(", ");
+  $("validInfo").textContent=circuit.fanout
+    ? (circuit.hasFanout?"✓ Circuito válido • fan-out ativo":"✓ Circuito válido • modo ramificação")
+    : "✓ Circuito válido • sem fan-out";
+  $("formula").textContent="Expressão oculta";
+  $("answer").textContent="Resposta oculta.";
+
+  drawCircuit(circuit);
+  renderSignals();
+  renderTable();
+}
+
+$("newBtn").onclick=()=>{exercise++;generate()};
+$("answerBtn").onclick=showAnswer;
+$("level").onchange=()=>{exercise++;generate()};
+$("mode").onchange=()=>{exercise++;generate()};
+$("fanout").onchange=()=>{exercise++;generate()};
+
+generate();
+</script>
+</body>
+</html>
